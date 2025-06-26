@@ -1,12 +1,21 @@
 import json
 import time
 from contextlib import ExitStack
+from io import BytesIO
 
 import requests
+from PIL import Image, ImageDraw
+
 from celery import shared_task
+from rembg import remove
 
 from config import config
-from panel.models import Mailing, User
+from config import font
+from panel.models import Mailing, User, Text, MultPack, LovePack, GamePack
+
+LOVEIS_POINTS = ((37, 126), (474, 380))
+GAME_POINTS = ((40, 20), (473, 440))
+MULT_POINTS = ((37, 44), (474, 380))
 
 
 @shared_task
@@ -102,3 +111,153 @@ def send_mailing(mailing_id: int):
 
     mailing.is_ok = True
     mailing.save()
+
+
+@shared_task
+def process_template(file_id, user_id: int, delete_message_id):
+    user = User.objects.get(id=user_id)
+
+    pack_classes = [MultPack, LovePack, GamePack]
+    pack = pack_classes[['mult', 'love', 'game'].index(user.data['current_template'])]
+
+    # Устанавливаем точки для разных пакетов
+    if pack == LovePack:
+        points = LOVEIS_POINTS
+    elif pack == MultPack:
+        points = MULT_POINTS
+    elif pack == GamePack:
+        points = GAME_POINTS
+
+    width, height = points[1][0] - points[0][0], points[1][1] - points[0][1]
+
+    template_obj = pack.objects.all()[user.data['current_n'] - 1]
+    with open(template_obj.template.path, 'rb') as f:
+        template_image = Image.open(BytesIO(f.read()))
+
+    file_id = file_id
+    file_info = requests.get(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/getFile?file_id={file_id}"
+    ).json()
+    file_path = file_info['result']['file_path']
+    image_data = requests.get(f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{file_path}").content
+    image = Image.open(BytesIO(image_data))
+
+    result = Image.new('RGBA', template_image.size, (255, 255, 255, 0))
+
+    if image.height / image.width > height / width:
+        image = image.resize((width, int(image.height / image.width * width)))
+    else:
+        image = image.resize((int(image.width / image.height * height), height))
+
+    result.paste(image, points[0])
+    result.alpha_composite(template_image)
+
+    result_byte_arr = BytesIO()
+    result.save(result_byte_arr, format='PNG')
+    result_byte_arr.seek(0)
+
+    text_ok = Text.objects.get(name='Делаем стикерпак (Кнопка Оставляем)')
+    text_again = Text.objects.get(name='Делаем стикерпак (Кнопка Поменять фото)')
+    text_menu = Text.objects.get(name='Кнопка Назад в меню')
+
+    requests.post(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/deleteMessage",
+        json={
+            'chat_id': user.id,
+            'message_id': delete_message_id
+        }
+    )
+
+    response = requests.post(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/sendSticker",
+        files={'sticker': ('result.png', result_byte_arr.getvalue())},
+        data={
+            'chat_id': user_id,
+            'reply_markup': json.dumps({
+                'inline_keyboard': [
+                    [{'text': text_ok.text, 'callback_data': 'agree'}],
+                    [{'text': text_again.text, 'callback_data': 'disagree'}],
+                    [{'text': text_menu.text, 'callback_data': 'back'}]
+                ]
+            })
+        }
+    )
+
+    user.data['message_ids'].append(response.json()['result']['message_id'])
+    user.save()
+
+
+@shared_task
+def process_sticker(file_id, user_id: int, delete_message_id):
+    user = User.objects.get(id=user_id)
+
+    file_response = requests.get(f"https://api.telegram.org/bot{config.BOT_TOKEN}/getFile?file_id={file_id}")
+    file_path = file_response.json()['result']['file_path']
+    image_data = requests.get(f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{file_path}").content
+
+    image = Image.open(BytesIO(image_data))
+    result = Image.new('RGBA', (512, 512), (255, 255, 255, 0))
+
+    points = ((0, 0), (512, 400))
+    width, height = points[1][0] - points[0][0], points[1][1] - points[0][1]
+
+    if image.height / image.width > height / width:
+        image = image.resize((width, int(image.height / image.width * width)))
+    else:
+        image = image.resize((int(image.width / image.height * height), height))
+
+    white_line = Image.new('RGB', (512, 512), (255, 255, 255))
+    draw = ImageDraw.Draw(white_line)
+    image = remove(image)
+
+    texts = ['']
+    for t in user.data['text'].split():
+        if len(texts[-1]) + len(t) + 1 > 25:
+            texts[-1] = texts[-1].strip()
+            texts.append(t)
+            continue
+        texts[-1] += f' {t}'
+
+    for i, t in enumerate(texts):
+        draw.text((10, 50 * i), text=t, fill=(0, 0, 0), font=font)
+
+    result.paste(image)
+    result.paste(white_line, (0, 400))
+
+    result_byte_arr = BytesIO()
+    result.save(result_byte_arr, format='PNG')
+    result_byte_arr.seek(0)
+
+    text_ok = Text.objects.get(name='Делаем стикерпак (Кнопка Оставляем)').text
+    text_again = Text.objects.get(name='Кнопка Переделать стикер (кастом)').text
+    text_stop = Text.objects.get(name='Кнопка Закончить стикерпак (кастом)').text
+    text_back = Text.objects.get(name='Назад в меню').text
+
+    files = {'sticker': ('result.png', result_byte_arr.getvalue())}
+
+    requests.post(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/deleteMessage",
+        json={
+            'chat_id': user.id,
+            'message_id': delete_message_id
+        }
+    )
+
+    response = requests.post(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/sendSticker",
+        data={
+            'chat_id': user.id,
+            'reply_markup': json.dumps({
+                'inline_keyboard': [
+                    [{'text': text_ok, 'callback_data': 'agree_my'}],
+                    [{'text': text_again, 'callback_data': 'disagree_my'}],
+                    [{'text': text_stop, 'callback_data': 'stop_my'}],
+                    [{'text': text_back, 'callback_data': 'back'}]
+                ]
+            })
+        },
+        files=files
+    )
+
+    user.data['message_ids'] = user.data.get('message_ids', []) + [response.json()['result']['message_id']]
+    user.save()

@@ -143,66 +143,24 @@ async def back(callback: CallbackQuery, user: User, bot: Bot):
 
 @router.message(F.document | F.photo)
 async def on_photo(message: Message, user: User, bot: Bot):
-    msg = await message.answer(
-        text='Мы обрабатываем ваше фото…\nКак только всё будет готово, мы пришлём вам уведомление.'
-    )
-    user.data['message_ids'].append(msg.message_id)
+    from panel.tasks import process_template
+
+    await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+    await message.delete()
 
     if user.data['current_template'] == 'my':
         await on_my_photo(message, user, bot)
         return
 
-    pack = (MultPack, LovePack, GamePack)[['mult', 'love', 'game'].index(user.data['current_template'])]
-
-    if pack == LovePack:
-        points = LOVEIS_POINTS
-    elif pack == MultPack:
-        points = MULT_POINTS
-    elif pack == GamePack:
-        points = GAME_POINTS
-
-    width, height = points[1][0] - points[0][0], points[1][1] - points[0][1]
-
-    async with aiofiles.open(
-            (await sync_to_async(lambda: pack.objects.all()[user.data['current_n'] - 1])()).template.path,
-            'rb') as f:
-        template_image = Image.open(BytesIO(await f.read()))
-
-    image = Image.open(
-        await bot.download(file=message.document.file_id if message.document else message.photo[-1].file_id)
-    )
-    result = Image.new('RGBA', template_image.size, (255, 255, 255, 0))
-
-    if image.height / image.width > height / width:
-        image = image.resize((width, int(image.height / image.width * width)))
-    else:
-        image = image.resize((int(image.width / image.height * height), height))
-
-    result.paste(image, points[0])
-    result.alpha_composite(template_image)
-
-    result_byte_arr = BytesIO()
-    result.save(result_byte_arr, format='PNG')
-    result_byte_arr.seek(0)
-
-    await message.delete()
-
-    text_ok = await Text.objects.aget(name='Делаем стикерпак (Кнопка Оставляем)')
-    text_again = await Text.objects.aget(name='Делаем стикерпак (Кнопка Поменять фото)')
-    text_menu = await Text.objects.aget(name='Кнопка Назад в меню')
-    msg = await message.answer_sticker(
-        sticker=BufferedInputFile(file=result_byte_arr.read(), filename='result.png'),
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=text_ok.text, callback_data='agree')],
-                [InlineKeyboardButton(text=text_again.text, callback_data='disagree')],
-                [InlineKeyboardButton(text=text_menu.text, callback_data='back')]
-            ]
-        )
+    wait_text = await Text.objects.aget(name='Текст ожидания')
+    msg = await message.answer(
+        text=wait_text.text
     )
 
-    user.data['message_ids'].append(msg.message_id)
-    await user.asave()
+    process_template.delay(
+        message.document.file_id if message.document else message.photo[-1].file_id,
+        user.id, msg.message_id
+    )
 
 
 @router.callback_query(F.data == 'agree')
@@ -365,66 +323,21 @@ async def on_text(message: Message, user: User, bot: Bot):
 
 
 async def on_my_photo(message: Message, user: User, bot: Bot):
-    await bot.delete_messages(chat_id=message.chat.id, message_ids=user.data['message_ids'] + [message.message_id])
+    from panel.tasks import process_sticker
 
-    image = Image.open(
-        await bot.download(file=message.document.file_id if message.document else message.photo[-1].file_id)
+    await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+
+    wait_text = await Text.objects.aget(name='Текст ожидания')
+    msg = await message.answer(
+        text=wait_text.text
     )
 
-    result = Image.new('RGBA', (512, 512), (255, 255, 255, 0))
-
-    points = ((0, 0), (512, 400))
-    width, height = points[1][0] - points[0][0], points[1][1] - points[0][1]
-
-    if image.height / image.width > height / width:
-        image = image.resize((width, int(image.height / image.width * width)))
-    else:
-        image = image.resize((int(image.width / image.height * height), height))
-
-    white_line = Image.new('RGB', (512, 512), (255, 255, 255))
-    draw = ImageDraw.Draw(white_line)
-    image = remove(image)
-
-    texts = ['']
-
-    for t in user.data['text'].split():
-        if len(texts[-1]) + len(t) + 1 > 25:
-            texts[-1] = texts[-1].strip()
-            texts.append(t)
-            continue
-
-        texts[-1] += f' {t}'
-
-    for i, t in enumerate(texts):
-        draw.text((10, 50 * i), text=t, fill=(0, 0, 0), font=config.font)
-
-    result.paste(image)
-    result.paste(white_line, (0, 400))
-
-    result_byte_arr = BytesIO()
-    result.save(result_byte_arr, format='PNG')
-    result_byte_arr.seek(0)
-
-    text_ok = await Text.objects.aget(name='Делаем стикерпак (Кнопка Оставляем)')
-    text_again = await Text.objects.aget(name='Кнопка Переделать стикер (кастом)')
-    text_stop = await Text.objects.aget(name='Кнопка Закончить стикерпак (кастом)')
-    text_back = await Text.objects.aget(name='Назад в меню')
-
-    msg = await message.answer_sticker(
-        sticker=BufferedInputFile(file=result_byte_arr.read(), filename='result.png'),
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=text_ok.text, callback_data='agree_my')],
-                [InlineKeyboardButton(text=text_again.text, callback_data='disagree_my')],
-                [InlineKeyboardButton(text=text_stop.text, callback_data='stop_my')],
-                [InlineKeyboardButton(text=text_back.text, callback_data='back')]
-            ]
-        )
+    process_sticker.delay(
+        message.document.file_id if message.document else message.photo[-1].file_id,
+        user.id,
+        msg.message_id
     )
-
-    user.data['message_ids'].append(msg.message_id)
-
-    await user.asave()
+    return
 
 
 @router.callback_query(F.data == 'disagree_my')
@@ -472,6 +385,7 @@ async def stop_my(callback: CallbackQuery, user: User, bot: Bot):
     text_done = await Text.objects.aget(name='Текст после создания стикерпака')
     text_share = await Text.objects.aget(name='Кнопка Поделиться')
     text_again = await Text.objects.aget(name='Кнопка Сгенерировать еще')
+    text_edit = await Text.objects.aget(name='Текст поделиться (который можно изменять)')
 
     await callback.message.answer(
         text=text_done.text,
@@ -481,8 +395,8 @@ async def stop_my(callback: CallbackQuery, user: User, bot: Bot):
                 [
                     InlineKeyboardButton(
                         text=text_share.text,
-                        url=f'https://t.me/share/url?url=https://t.me/Yandexkids_Stickers_bot&'
-                            f'text={quote("Этот бот сделает для вас стикерпак с вашим ребенком. Попробуйте!")}'
+                        url=f'https://t.me/share/url?url=https://t.me/{(await bot.get_me()).username}&'
+                            f'text={quote(text_edit.text)}'
                     )
                 ]
             ]
