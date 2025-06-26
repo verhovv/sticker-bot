@@ -7,10 +7,3 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.settings')
 app = Celery('bot-template')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
-
-app.conf.beat_schedule = {
-    'example': {
-        'task': 'panel.tasks.example_task',
-        'schedule': crontab(minute='*/1'),
-    },
-}

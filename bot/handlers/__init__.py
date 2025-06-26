@@ -143,6 +143,11 @@ async def back(callback: CallbackQuery, user: User, bot: Bot):
 
 @router.message(F.document | F.photo)
 async def on_photo(message: Message, user: User, bot: Bot):
+    msg = await message.answer(
+        text='Мы обрабатываем ваше фото…\nКак только всё будет готово, мы пришлём вам уведомление.'
+    )
+    user.data['message_ids'].append(msg.message_id)
+
     if user.data['current_template'] == 'my':
         await on_my_photo(message, user, bot)
         return

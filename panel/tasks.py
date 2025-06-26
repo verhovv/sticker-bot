@@ -102,8 +102,3 @@ def send_mailing(mailing_id: int):
 
     mailing.is_ok = True
     mailing.save()
-
-
-@shared_task
-def example_task():
-    print("Пример периодической задачи")
