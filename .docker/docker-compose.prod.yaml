@@ -37,28 +37,6 @@ services:
       - postgres
     restart: unless-stopped
 
-  celery_worker:
-    build:
-      context: ../
-      dockerfile: .docker/default/Dockerfile
-    command: celery -A web worker --loglevel=info --pool=solo
-    volumes:
-      - ..:/app
-    depends_on:
-      - postgres
-    restart: unless-stopped
-
-  celery_beat:
-    build:
-      context: ../
-      dockerfile: .docker/default/Dockerfile
-    command: celery -A web beat --loglevel=info
-    volumes:
-      - ..:/app
-    depends_on:
-      - postgres
-    restart: unless-stopped
-
   postgres:
     image: postgres
     environment:
@@ -67,12 +45,6 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  redis:
-    image: redis
-    volumes:
-      - redis_data:/data
     restart: unless-stopped
 
 volumes:
