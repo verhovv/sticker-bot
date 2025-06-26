@@ -218,6 +218,7 @@ async def agree(callback: CallbackQuery, user: User, bot: Bot):
         text_done = await Text.objects.aget(name='Текст после создания стикерпака')
         text_share = await Text.objects.aget(name='Кнопка Поделиться')
         text_again = await Text.objects.aget(name='Кнопка Сгенерировать еще')
+        text_edit = await Text.objects.aget(name='Текст поделиться (который можно изменять)')
 
         await callback.message.answer(
             text=text_done.text,
@@ -227,8 +228,8 @@ async def agree(callback: CallbackQuery, user: User, bot: Bot):
                     [
                         InlineKeyboardButton(
                             text=text_share.text,
-                            url=f'https://t.me/share/url?url=https://t.me/Yandexkids_Stickers_bot&'
-                                f'text={quote("Этот бот сделает для вас стикерпак с вашим ребенком. Попробуйте!")}'
+                            url=f'https://t.me/share/url?url=https://t.me/{(await bot.get_me()).username}&'
+                                f'text={quote(text_edit.text)}'
                         )
                     ]
                 ]
