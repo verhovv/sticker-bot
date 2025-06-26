@@ -45,3 +45,92 @@ class Mailing(models.Model):
     class Meta:
         verbose_name = 'Рассылка'
         verbose_name_plural = 'Рассылки'
+
+
+class MultPack(models.Model):
+    template = models.FileField('Шаблон', upload_to='media/templates/mult', null=True)
+    file_id = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Шаблон МультМемчики'
+        verbose_name_plural = 'Шаблоны "МультМемчики"'
+
+    def __str__(self):
+        return str(self.template.url)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_photo = MultPack.objects.get(pk=self.pk).template
+            if old_photo != self.template:
+                self.file_id = None
+        super().save(*args, **kwargs)
+
+
+class LovePack(models.Model):
+    template = models.FileField('Шаблон', upload_to='media/templates/mult', null=True)
+    file_id = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Шаблон "Love is..."'
+        verbose_name_plural = 'Шаблоны "Love is..."'
+
+    def __str__(self):
+        return str(self.template.url)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_photo = LovePack.objects.get(pk=self.pk).template
+            if old_photo != self.template:
+                self.file_id = None
+        super().save(*args, **kwargs)
+
+
+class GamePack(models.Model):
+    template = models.FileField('Шаблон', upload_to='media/templates/mult', null=True)
+    file_id = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Шаблон "Игра престолов"'
+        verbose_name_plural = 'Шаблоны "Игра престолов"'
+
+    def __str__(self):
+        return str(self.template.url)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_photo = GamePack.objects.get(pk=self.pk).template
+            if old_photo != self.template:
+                self.file_id = None
+        super().save(*args, **kwargs)
+
+
+class Text(models.Model):
+    name = models.CharField('Название текста', primary_key=True)
+    text = models.TextField('Текст', null=True)
+
+    class Meta:
+        verbose_name = 'Текст'
+        verbose_name_plural = 'Тексты'
+
+    def __str__(self):
+        return self.name
+
+
+class Statistic(models.Model):
+    name = models.CharField('Название', primary_key=True)
+    value = models.IntegerField('Значение', default=0)
+
+    class Meta:
+        verbose_name = 'Статистика'
+        verbose_name_plural = 'Статистика'
+
+    def __str__(self):
+        return str(self.name)
+
+    @staticmethod
+    async def setup():
+        await Statistic.objects.aget_or_create(name='Стикеров МультМемчики')
+        await Statistic.objects.aget_or_create(name='Стикеров Love is...')
+        await Statistic.objects.aget_or_create(name='Стикеров Игра престолов')
+        await Statistic.objects.aget_or_create(name='Стикеров Кастомных')
+        await Statistic.objects.aget_or_create(name='Стикеров Всего')

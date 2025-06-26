@@ -1,3 +1,4 @@
+from PIL import ImageFont
 from pydantic_settings import BaseSettings
 
 
@@ -23,3 +24,4 @@ class Config(BaseSettings):
 
 
 config = Config()
+font = ImageFont.truetype('font.ttf', size=50)
