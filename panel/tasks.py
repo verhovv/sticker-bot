@@ -120,7 +120,6 @@ def process_template(file_id, user_id: int, delete_message_id):
     pack_classes = [MultPack, LovePack, GamePack]
     pack = pack_classes[['mult', 'love', 'game'].index(user.data['current_template'])]
 
-    # Устанавливаем точки для разных пакетов
     if pack == LovePack:
         points = LOVEIS_POINTS
     elif pack == MultPack:
@@ -219,7 +218,7 @@ def process_sticker(file_id, user_id: int, delete_message_id):
         texts[-1] += f' {t}'
 
     for i, t in enumerate(texts):
-        draw.text((10, 50 * i), text=t, fill=(0, 0, 0), font=font)
+        draw.text((250 - font.getlength(t) // 2, 50 * i), text=t, fill=(0, 0, 0), font=font)
 
     result.paste(image)
     result.paste(white_line, (0, 400))
