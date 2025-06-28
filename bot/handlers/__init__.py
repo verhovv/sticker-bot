@@ -305,7 +305,6 @@ async def my(callback: CallbackQuery, user: User, bot: Bot):
 
     if 'current_n' not in user.data:
         user.data['current_n'] = 1
-    else:
         await callback.message.delete()
 
     user.data['current_template'] = 'my'
