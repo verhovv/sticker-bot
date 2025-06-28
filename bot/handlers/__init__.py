@@ -291,8 +291,6 @@ async def my(callback: CallbackQuery, user: User, bot: Bot):
 
 @router.callback_query(F.data == 'my1')
 async def my(callback: CallbackQuery, user: User, bot: Bot):
-    await callback.message.delete()
-
     first = 'sticker_file_ids' not in user.data
     text = await Text.objects.aget(
         name='Текст Отправьте текст для стикера (кастом)') if first else await Text.objects.aget(
@@ -307,6 +305,8 @@ async def my(callback: CallbackQuery, user: User, bot: Bot):
 
     if 'current_n' not in user.data:
         user.data['current_n'] = 1
+    else:
+        await callback.message.delete()
 
     user.data['current_template'] = 'my'
     user.data['message_ids'] = [msg.message_id]
