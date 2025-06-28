@@ -268,7 +268,7 @@ async def disagree(callback: CallbackQuery, user: User, bot: Bot):
 
 
 @router.callback_query(F.data == 'my')
-async def my(callback: CallbackQuery, user: User, bot: Bot):
+async def my213(callback: CallbackQuery, user: User, bot: Bot):
     text = await Text.objects.aget(name='Описание кастомного стикерпака')
     text_start = await Text.objects.aget(name='Начинаем делать стикерпак (Кнопка Начать)')
     text_back = await Text.objects.aget(name='Начинаем делать стикерпак (Кнопка Назад)')
