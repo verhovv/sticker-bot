@@ -1,20 +1,14 @@
 import uuid
-from io import BytesIO
 from urllib.parse import quote
 
-import aiofiles
 from aiogram import Router, F, Bot
 from aiogram.enums import StickerFormat, StickerType
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, \
-    FSInputFile, BufferedInputFile, InputSticker
 from aiogram.filters.command import CommandStart
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, \
+    FSInputFile, InputSticker
 from asgiref.sync import sync_to_async
 
-import config
 from panel.models import *
-
-from PIL import Image, ImageFont, ImageDraw
-from rembg import remove
 
 router = Router()
 
@@ -37,9 +31,9 @@ async def command_start(message: Message, user: User):
         text=text.text,
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text='Cтикерпак МультМемчики', callback_data='mult')],
-                [InlineKeyboardButton(text='Стикерпак Love is...', callback_data='love')],
-                [InlineKeyboardButton(text='Стикерпак Игра пристолов "Битва за игрушки"', callback_data='game')],
+                [InlineKeyboardButton(text='Cтикерпак «МультМемчики»', callback_data='mult')],
+                [InlineKeyboardButton(text='Стикерпак «Love is...»', callback_data='love')],
+                [InlineKeyboardButton(text='Стикерпак «Игра престолов "Битва за игрушки"»', callback_data='game')],
                 [InlineKeyboardButton(text='Создать свой стикерпак', callback_data='my')],
             ]
         )
@@ -56,12 +50,15 @@ async def on_template_stickers(callback: CallbackQuery, user: User, bot):
 
     if 'current_n' in user.data:
         await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
-        current_template = templates[user.data['current_n'] - 1]
+        current_n = user.data['current_n']
+        current_template = templates[current_n - 1]
+
+        stickers_amount = await sync_to_async(len)(pack.objects.all())
 
         msg = await callback.message.answer_photo(
             photo=FSInputFile(
                 path=current_template.template.path) if not current_template.file_id else current_template.file_id,
-            caption=text.text,
+            caption=text.text + f'\n\nОсталось сделать {stickers_amount - current_n + 1} стикеров',
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text=back_text.text, callback_data='back')]
@@ -140,6 +137,8 @@ async def back(callback: CallbackQuery, user: User, bot: Bot):
     user.data.clear()
     await user.asave()
 
+    await command_start(callback, user)
+
 
 @router.message(F.document | F.photo)
 async def on_photo(message: Message, user: User, bot: Bot):
@@ -166,9 +165,9 @@ async def on_photo(message: Message, user: User, bot: Bot):
 @router.callback_query(F.data == 'agree')
 async def agree(callback: CallbackQuery, user: User, bot: Bot):
     if 'sticker_file_ids' in user.data:
-        user.data['sticker_file_ids'].append(callback.message.sticker.file_id)
+        user.data['sticker_file_ids'].append(user.data['sticker_id'])
     else:
-        user.data['sticker_file_ids'] = [callback.message.sticker.file_id]
+        user.data['sticker_file_ids'] = [user.data['sticker_id']]
 
     await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
 
@@ -256,10 +255,48 @@ async def agree(callback: CallbackQuery, user: User, bot: Bot):
 async def disagree(callback: CallbackQuery, user: User, bot: Bot):
     await callback.message.delete()
 
+    callback = CallbackQuery(
+        data=user.data['current_template'],
+        message=callback.message,
+        inline_message_id=None,
+        chat_instance=callback.chat_instance,
+        id=callback.id,
+        from_user=callback.from_user,
+    )
+
+    await on_template_stickers(callback, user, bot)
+
 
 @router.callback_query(F.data == 'my')
 async def my(callback: CallbackQuery, user: User, bot: Bot):
-    text = await Text.objects.aget(name='Текст Отправьте текст для стикера (кастом)')
+    text = await Text.objects.aget(name='Описание кастомного стикерпака')
+    text_start = await Text.objects.aget(name='Начинаем делать стикерпак (Кнопка Начать)')
+    text_back = await Text.objects.aget(name='Начинаем делать стикерпак (Кнопка Назад)')
+
+    message = await callback.message.answer(
+        text=text.text,
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=text_start.text, callback_data='my1'),
+                    InlineKeyboardButton(text=text_back.text, callback_data='back'),
+                ]
+            ]
+        )
+    )
+
+    user.data['message_ids'] = user.data.get('message_ids', []) + [message.message_id]
+    await user.asave()
+
+
+@router.callback_query(F.data == 'my1')
+async def my(callback: CallbackQuery, user: User, bot: Bot):
+    await callback.message.delete()
+
+    first = 'sticker_file_ids' not in user.data
+    text = await Text.objects.aget(
+        name='Текст Отправьте текст для стикера (кастом)') if first else await Text.objects.aget(
+        name='Текст Отправьте текст для стикера (кастом, последующее)')
     text_back = await Text.objects.aget(name='Кнопка Назад в меню')
     msg = await callback.message.answer(
         text=text.text,
@@ -282,9 +319,9 @@ async def my_agree(callback: CallbackQuery, user: User, bot: Bot):
     await bot.delete_messages(chat_id=callback.message.chat.id, message_ids=user.data['message_ids'])
 
     if 'sticker_file_ids' in user.data:
-        user.data['sticker_file_ids'].append(callback.message.sticker.file_id)
+        user.data['sticker_file_ids'].append(user.data['sticker_id'])
     else:
-        user.data['sticker_file_ids'] = [callback.message.sticker.file_id]
+        user.data['sticker_file_ids'] = [user.data['sticker_id']]
 
     user.data['current_n'] += 1
     await user.asave()
@@ -299,17 +336,21 @@ async def on_text(message: Message, user: User, bot: Bot):
     if user.data['state'] != 'text':
         return
 
+    first = 'sticker_file_ids' not in user.data
     text_error = await Text.objects.aget(name='Ошибка много символов (кастом)')
+    text_back = await Text.objects.aget(name='Кнопка Назад в меню')
     if len(message.text) > 50:
         await message.answer(
             text=text_error.text,
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text='Удалить оповещение', callback_data='disagree')]]
+                inline_keyboard=[[InlineKeyboardButton(text=text_back.text, callback_data='back')]]
             )
         )
         return
 
-    text = await Text.objects.aget(name='Текст Отправьте фото для стикера (кастом)')
+    text = await Text.objects.aget(
+        name='Текст Отправьте фото для стикера (кастом)') if first else await Text.objects.aget(
+        name='Текст Отправьте фото для стикера (кастом, последующее)')
     text_back = await Text.objects.aget(name='Кнопка Назад в меню')
     msg = await message.answer(
         text=text.text,
@@ -354,9 +395,9 @@ async def disagree_my(callback_query: CallbackQuery, user: User, bot: Bot):
 @router.callback_query(F.data == 'stop_my')
 async def stop_my(callback: CallbackQuery, user: User, bot: Bot):
     if 'sticker_file_ids' in user.data:
-        user.data['sticker_file_ids'].append(callback.message.sticker.file_id)
+        user.data['sticker_file_ids'].append(user.data['sticker_id'])
     else:
-        user.data['sticker_file_ids'] = [callback.message.sticker.file_id]
+        user.data['sticker_file_ids'] = [user.data['sticker_id']]
 
     await bot.delete_messages(
         chat_id=callback.message.chat.id,

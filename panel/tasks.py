@@ -54,7 +54,6 @@ def send_mailing(mailing_id: int):
                     if attachment_type == 'photo':
                         file_id = response.json()['result']['photo'][-1]['file_id']
                     else:
-                        print(response.json())
                         file_id = response.json()['result'][attachment_type]['file_id']
 
                     attachment.file_id = file_id
@@ -128,8 +127,9 @@ def process_template(file_id, user_id: int, delete_message_id):
         points = GAME_POINTS
 
     width, height = points[1][0] - points[0][0], points[1][1] - points[0][1]
+    current_n = user.data['current_n']
 
-    template_obj = pack.objects.all()[user.data['current_n'] - 1]
+    template_obj = pack.objects.all()[current_n - 1]
     with open(template_obj.template.path, 'rb') as f:
         template_image = Image.open(BytesIO(f.read()))
 
@@ -167,21 +167,32 @@ def process_template(file_id, user_id: int, delete_message_id):
         }
     )
 
-    response = requests.post(
+    sticker_response = requests.post(
         f"https://api.telegram.org/bot{config.BOT_TOKEN}/sendSticker",
         files={'sticker': ('result.png', result_byte_arr.getvalue())},
         data={
             'chat_id': user_id,
-            'reply_markup': json.dumps({
+        }
+    )
+    user.data['message_ids'].append(sticker_response.json()['result']['message_id'])
+
+    text = Text.objects.get(name='Ваш стикер готов (для шаблонных)')
+    response = requests.post(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/sendMessage",
+        json={
+            'chat_id': user_id,
+            'text': text.text,
+            'reply_markup': {
                 'inline_keyboard': [
                     [{'text': text_ok.text, 'callback_data': 'agree'}],
                     [{'text': text_again.text, 'callback_data': 'disagree'}],
                     [{'text': text_menu.text, 'callback_data': 'back'}]
                 ]
-            })
+            }
         }
     )
 
+    user.data['sticker_id'] = sticker_response.json()['result']['sticker']['file_id']
     user.data['message_ids'].append(response.json()['result']['message_id'])
     user.save()
 
@@ -242,21 +253,32 @@ def process_sticker(file_id, user_id: int, delete_message_id):
         }
     )
 
-    response = requests.post(
+    sticker_response = requests.post(
         f"https://api.telegram.org/bot{config.BOT_TOKEN}/sendSticker",
         data={
             'chat_id': user.id,
-            'reply_markup': json.dumps({
+        },
+        files=files
+    )
+    user.data['message_ids'].append(sticker_response.json()['result']['message_id'])
+
+    text = Text.objects.get(name='Ваш стикер готов (для кастомных)')
+    response = requests.post(
+        f"https://api.telegram.org/bot{config.BOT_TOKEN}/sendMessage",
+        json={
+            'chat_id': user_id,
+            'text': text.text,
+            'reply_markup': {
                 'inline_keyboard': [
                     [{'text': text_ok, 'callback_data': 'agree_my'}],
                     [{'text': text_again, 'callback_data': 'disagree_my'}],
                     [{'text': text_stop, 'callback_data': 'stop_my'}],
                     [{'text': text_back, 'callback_data': 'back'}]
                 ]
-            })
-        },
-        files=files
+            }
+        }
     )
 
-    user.data['message_ids'] = user.data.get('message_ids', []) + [response.json()['result']['message_id']]
+    user.data['sticker_id'] = sticker_response.json()['result']['sticker']['file_id']
+    user.data['message_ids'].append(response.json()['result']['message_id'])
     user.save()
