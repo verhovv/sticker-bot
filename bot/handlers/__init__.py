@@ -351,6 +351,7 @@ async def my_agree(callback: CallbackQuery, user: User, bot: Bot):
 
 @router.message(lambda _, user: user.data.get('state', '') == 'text')
 async def on_text(message: Message, user: User, bot: Bot):
+    print(123)
     await bot.delete_messages(chat_id=message.chat.id, message_ids=user.data['message_ids'] + [message.message_id])
 
     if message.photo:
@@ -393,7 +394,12 @@ async def on_text(message: Message, user: User, bot: Bot):
 async def on_my_photo(message: Message, user: User, bot: Bot):
     from panel.tasks import process_sticker
 
-    await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+    try:
+        await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+    except:
+        user.data['message_ids'] = list()
+        await user.asave()
+        pass
 
     wait_text = await Text.objects.aget(name='Текст ожидания')
     msg = await message.answer(
