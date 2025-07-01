@@ -49,7 +49,13 @@ async def on_template_stickers(callback: CallbackQuery, user: User, bot):
     back_text = await Text.objects.aget(name='Назад в меню')
 
     if 'current_n' in user.data:
-        await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+        try:
+            await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+        except:
+            user.data['message_ids'] = list()
+            await user.asave()
+            pass
+
         current_n = user.data['current_n']
         current_template = templates[current_n - 1]
 
