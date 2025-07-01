@@ -4,6 +4,9 @@ import django
 import sys
 import os
 
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "web.settings")
 django.setup()
@@ -18,7 +21,7 @@ from aiogram.utils.callback_answer import CallbackAnswerMiddleware
 
 
 async def main():
-    bot = Bot(token=config.BOT_TOKEN)
+    bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
     dp = Dispatcher()
     dp.callback_query.outer_middleware(CallbackAnswerMiddleware())

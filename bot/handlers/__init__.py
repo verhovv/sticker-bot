@@ -58,7 +58,7 @@ async def on_template_stickers(callback: CallbackQuery, user: User, bot):
         msg = await callback.message.answer_photo(
             photo=FSInputFile(
                 path=current_template.template.path) if not current_template.file_id else current_template.file_id,
-            caption=text.text + f'\n\nОсталось сделать {stickers_amount - current_n + 1} стикеров',
+            caption=text.text + f'\n\n<b>Осталось сделать стикеров: {stickers_amount - current_n + 1}</b>',
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text=back_text.text, callback_data='back')]
@@ -144,7 +144,12 @@ async def back(callback: CallbackQuery, user: User, bot: Bot):
 async def on_photo(message: Message, user: User, bot: Bot):
     from panel.tasks import process_template
 
-    await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+    try:
+        await bot.delete_messages(chat_id=message.chat.id, message_ids=user.data['message_ids'])
+        user.data['message_ids'] = list()
+        await user.asave()
+    except:
+        pass
     await message.delete()
 
     if user.data['current_template'] == 'my':
@@ -169,7 +174,12 @@ async def agree(callback: CallbackQuery, user: User, bot: Bot):
     else:
         user.data['sticker_file_ids'] = [user.data['sticker_id']]
 
-    await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
+    try:
+        await bot.delete_messages(chat_id=callback.message.chat.id, message_ids=user.data['message_ids'])
+        user.data['message_ids'] = list()
+        await user.asave()
+    except:
+        pass
 
     pack = (LovePack, MultPack, GamePack)[['love', 'mult', 'game'].index(user.data['current_template'])]
 
@@ -315,7 +325,12 @@ async def my(callback: CallbackQuery, user: User, bot: Bot):
 
 @router.callback_query(F.data == 'agree_my')
 async def my_agree(callback: CallbackQuery, user: User, bot: Bot):
-    await bot.delete_messages(chat_id=callback.message.chat.id, message_ids=user.data['message_ids'])
+    try:
+        await bot.delete_messages(chat_id=callback.message.chat.id, message_ids=user.data['message_ids'])
+        user.data['message_ids'] = list()
+        await user.asave()
+    except:
+        pass
 
     if 'sticker_file_ids' in user.data:
         user.data['sticker_file_ids'].append(user.data['sticker_id'])
@@ -328,11 +343,16 @@ async def my_agree(callback: CallbackQuery, user: User, bot: Bot):
     await my(callback, user, bot)
 
 
-@router.message(F.text)
+@router.message(lambda _, user: user.data.get('state', '') == 'text')
 async def on_text(message: Message, user: User, bot: Bot):
     await bot.delete_messages(chat_id=message.chat.id, message_ids=user.data['message_ids'] + [message.message_id])
 
-    if user.data['state'] != 'text':
+    if message.photo:
+        await message.delete()
+        msg = await message.answer(text='Нет, пришлите текст')
+
+        user.data['message_ids'] = [msg.message_id]
+        await user.asave()
         return
 
     first = 'sticker_file_ids' not in user.data
@@ -360,6 +380,7 @@ async def on_text(message: Message, user: User, bot: Bot):
 
     user.data['message_ids'] = [msg.message_id]
     user.data['text'] = message.text.upper()
+    user.data['state'] = 'start'
     await user.asave()
 
 
