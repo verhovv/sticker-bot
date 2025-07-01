@@ -351,16 +351,7 @@ async def my_agree(callback: CallbackQuery, user: User, bot: Bot):
 
 @router.message(lambda _, user: user.data.get('state', '') == 'text')
 async def on_text(message: Message, user: User, bot: Bot):
-    print(123)
     await bot.delete_messages(chat_id=message.chat.id, message_ids=user.data['message_ids'] + [message.message_id])
-
-    if message.photo:
-        await message.delete()
-        msg = await message.answer(text='Нет, пришлите текст')
-
-        user.data['message_ids'] = [msg.message_id]
-        await user.asave()
-        return
 
     first = 'sticker_file_ids' not in user.data
     text_error = await Text.objects.aget(name='Ошибка много символов (кастом)')
@@ -393,6 +384,14 @@ async def on_text(message: Message, user: User, bot: Bot):
 
 async def on_my_photo(message: Message, user: User, bot: Bot):
     from panel.tasks import process_sticker
+
+    if user.data.get('state', '') == 'text':
+        await message.delete()
+        msg = await message.answer(text='Нет, пришлите текст')
+
+        user.data['message_ids'] = [msg.message_id]
+        await user.asave()
+        return
 
     try:
         await bot.delete_messages(chat_id=user.id, message_ids=user.data['message_ids'])
