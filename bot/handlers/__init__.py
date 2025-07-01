@@ -386,7 +386,6 @@ async def on_my_photo(message: Message, user: User, bot: Bot):
     from panel.tasks import process_sticker
 
     if user.data.get('state', '') == 'text':
-        await message.delete()
         msg = await message.answer(text='Нет, пришлите текст')
 
         user.data['message_ids'] = [msg.message_id]
