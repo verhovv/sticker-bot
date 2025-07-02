@@ -386,7 +386,8 @@ async def on_my_photo(message: Message, user: User, bot: Bot):
     from panel.tasks import process_sticker
 
     if user.data.get('state', '') == 'text':
-        msg = await message.answer(text='Для того, чтобы создать стикер сначала пришлите <b>текстовую подпись</b>, а после этого картинку')
+        text = await Text.objects.aget(name='Когда скинули фото раньше текста (кастом)')
+        msg = await message.answer(text=text.text)
 
         user.data['message_ids'] = [msg.message_id]
         await user.asave()
