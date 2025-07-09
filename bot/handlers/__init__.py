@@ -20,6 +20,9 @@ MULT_POINTS = ((37, 44), (474, 380))
 @router.callback_query(F.data == 'menu')
 @router.message(Command(commands=['start', 'menu']))
 async def command_start(message: Message, user: User):
+    user.data.clear()
+    await user.asave()
+
     if isinstance(message, Message):
         try:
             await message.delete()
