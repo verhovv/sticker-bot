@@ -3,7 +3,7 @@ from urllib.parse import quote
 
 from aiogram import Router, F, Bot
 from aiogram.enums import StickerFormat, StickerType
-from aiogram.filters.command import CommandStart
+from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, \
     FSInputFile, InputSticker
 from asgiref.sync import sync_to_async
@@ -18,23 +18,28 @@ MULT_POINTS = ((37, 44), (474, 380))
 
 
 @router.callback_query(F.data == 'menu')
-@router.message(CommandStart())
+@router.message(Command(commands=['start', 'menu']))
 async def command_start(message: Message, user: User):
     if isinstance(message, Message):
-        await message.delete()
+        try:
+            await message.delete()
+        except:
+            pass
     if isinstance(message, CallbackQuery):
         message = message.message
 
     text = await Text.objects.aget(name='Приветственное сообщение')
+    photo = FSInputFile(path='init.png')
 
-    await message.answer(
-        text=text.text,
+    await message.answer_photo(
+        photo=photo,
+        caption=text.text,
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
+                [InlineKeyboardButton(text='Создать свой стикерпак', callback_data='my')],
                 [InlineKeyboardButton(text='Cтикерпак «МультМемчики»', callback_data='mult')],
                 [InlineKeyboardButton(text='Стикерпак «Love is...»', callback_data='love')],
-                [InlineKeyboardButton(text='Стикерпак «Игра престолов "Битва за игрушки"»', callback_data='game')],
-                [InlineKeyboardButton(text='Создать свой стикерпак', callback_data='my')],
+                [InlineKeyboardButton(text='Стикерпак «Игра престолов "Битва за игрушки"»', callback_data='game')]
             ]
         )
     )

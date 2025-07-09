@@ -157,7 +157,6 @@ def process_template(file_id, user_id: int, delete_message_id):
 
     text_ok = Text.objects.get(name='Делаем стикерпак (Кнопка Оставляем)')
     text_again = Text.objects.get(name='Делаем стикерпак (Кнопка Поменять фото)')
-    text_menu = Text.objects.get(name='Кнопка Назад в меню')
 
     requests.post(
         f"https://api.telegram.org/bot{config.BOT_TOKEN}/deleteMessage",
@@ -185,8 +184,7 @@ def process_template(file_id, user_id: int, delete_message_id):
             'reply_markup': {
                 'inline_keyboard': [
                     [{'text': text_ok.text, 'callback_data': 'agree'}],
-                    [{'text': text_again.text, 'callback_data': 'disagree'}],
-                    [{'text': text_menu.text, 'callback_data': 'back'}]
+                    [{'text': text_again.text, 'callback_data': 'disagree'}]
                 ]
             }
         }
