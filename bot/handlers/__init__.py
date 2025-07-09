@@ -51,7 +51,6 @@ async def on_template_stickers(callback: CallbackQuery, user: User, bot):
     templates = await sync_to_async(lambda: list(pack.objects.all()))()
 
     text = await Text.objects.aget(name='Просим загрузить фотографию ребенка')
-    back_text = await Text.objects.aget(name='Назад в меню')
 
     if 'current_n' in user.data:
         try:
@@ -69,12 +68,7 @@ async def on_template_stickers(callback: CallbackQuery, user: User, bot):
         msg = await callback.message.answer_photo(
             photo=FSInputFile(
                 path=current_template.template.path) if not current_template.file_id else current_template.file_id,
-            caption=text.text + f'\n\n<b>Осталось сделать стикеров: {stickers_amount - current_n + 1}</b>',
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text=back_text.text, callback_data='back')]
-                ]
-            )
+            caption=text.text + f'\n\n<b>Осталось сделать стикеров: {stickers_amount - current_n + 1}</b>'
         )
 
         user.data['message_ids'] = [msg.message_id]
@@ -211,8 +205,9 @@ async def agree(callback: CallbackQuery, user: User, bot: Bot):
             case 'game':
                 title = 'Игра престолов Битва за игрушки'
                 s = await Statistic.objects.aget(name='Стикеров Игра престолов')
-                s.value += 1
-                await s.asave()
+
+        s.value += 1
+        await s.asave()
 
         s = await Statistic.objects.aget(name='Стикеров Всего')
         s.value += 1
