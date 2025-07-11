@@ -239,7 +239,6 @@ def process_sticker(file_id, user_id: int, delete_message_id):
     text_ok = Text.objects.get(name='Делаем стикерпак (Кнопка Оставляем)').text
     text_again = Text.objects.get(name='Кнопка Переделать стикер (кастом)').text
     text_stop = Text.objects.get(name='Кнопка Закончить стикерпак (кастом)').text
-    text_back = Text.objects.get(name='Назад в меню').text
 
     files = {'sticker': ('result.png', result_byte_arr.getvalue())}
 
@@ -270,8 +269,7 @@ def process_sticker(file_id, user_id: int, delete_message_id):
                 'inline_keyboard': [
                     [{'text': text_ok, 'callback_data': 'agree_my'}],
                     [{'text': text_again, 'callback_data': 'disagree_my'}],
-                    [{'text': text_stop, 'callback_data': 'stop_my'}],
-                    [{'text': text_back, 'callback_data': 'back'}]
+                    [{'text': text_stop, 'callback_data': 'stop_my'}]
                 ]
             }
         }

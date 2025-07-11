@@ -314,12 +314,8 @@ async def my(callback: CallbackQuery, user: User, bot: Bot):
     text = await Text.objects.aget(
         name='Текст Отправьте текст для стикера (кастом)') if first else await Text.objects.aget(
         name='Текст Отправьте текст для стикера (кастом, последующее)')
-    text_back = await Text.objects.aget(name='Кнопка Назад в меню')
     msg = await callback.message.answer(
         text=text.text,
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text=text_back.text, callback_data='back')]]
-        )
     )
 
     if 'current_n' not in user.data:
@@ -358,25 +354,18 @@ async def on_text(message: Message, user: User, bot: Bot):
 
     first = 'sticker_file_ids' not in user.data
     text_error = await Text.objects.aget(name='Ошибка много символов (кастом)')
-    text_back = await Text.objects.aget(name='Кнопка Назад в меню')
     if len(message.text) > 50:
         await message.answer(
-            text=text_error.text,
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text=text_back.text, callback_data='back')]]
-            )
+            text=text_error.text
         )
         return
 
     text = await Text.objects.aget(
         name='Текст Отправьте фото для стикера (кастом)') if first else await Text.objects.aget(
         name='Текст Отправьте фото для стикера (кастом, последующее)')
-    text_back = await Text.objects.aget(name='Кнопка Назад в меню')
+
     msg = await message.answer(
         text=text.text,
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text=text_back.text, callback_data='back')]]
-        )
     )
 
     user.data['message_ids'] = [msg.message_id]
