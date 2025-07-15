@@ -129,7 +129,7 @@ def process_template(file_id, user_id: int, delete_message_id):
     width, height = points[1][0] - points[0][0], points[1][1] - points[0][1]
     current_n = user.data['current_n']
 
-    template_obj = pack.objects.all()[current_n - 1]
+    template_obj = pack.objects.order_by('id')[current_n - 1]
     with open(template_obj.template.path, 'rb') as f:
         template_image = Image.open(BytesIO(f.read()))
 

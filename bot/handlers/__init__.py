@@ -50,8 +50,8 @@ async def command_start(message: Message, user: User):
 
 @router.callback_query(F.data.in_({'mult', 'love', 'game'}))
 async def on_template_stickers(callback: CallbackQuery, user: User, bot):
-    pack = (MultPack, LovePack, GamePack)[['mult', 'love', 'game'].index(callback.data)]
-    templates = await sync_to_async(lambda: list(pack.objects.all()))()
+    pack: MultPack | LovePack | GamePack = (MultPack, LovePack, GamePack)[['mult', 'love', 'game'].index(callback.data)]
+    templates = await sync_to_async(lambda: list(pack.objects.order_by('id')))()
 
     text = await Text.objects.aget(name='Просим загрузить фотографию ребенка')
 
